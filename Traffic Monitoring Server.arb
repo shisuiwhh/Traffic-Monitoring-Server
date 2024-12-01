@@ -8,9 +8,9 @@ LOG_FILE = "traffic_log.json"
 BLOCKED_IPS = []
 traffic_data = Hash.new { |hash, key| hash[key] = [] }
 
-server = TCPServer.new('0.0.0.0', 80)
+server = TCPServer.new('0.0.0.0', 8080)
 
-puts "Traffic Monitoring Server running on port 80..."
+puts "Traffic Monitoring Server running on port 8080..."
 
 def log_traffic(ip, action)
   entry = {
