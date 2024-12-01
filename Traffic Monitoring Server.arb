@@ -1,0 +1,59 @@
+require 'socket'
+require 'time'
+require 'json'
+
+THRESHOLD_REQUESTS = 100
+MONITOR_INTERVAL = 60
+LOG_FILE = "traffic_log.json"
+BLOCKED_IPS = []
+traffic_data = Hash.new { |hash, key| hash[key] = [] }
+
+server = TCPServer.new('0.0.0.0', 80)
+
+puts "Traffic Monitoring Server running on port 80..."
+
+def log_traffic(ip, action)
+  entry = {
+    timestamp: Time.now.iso8601,
+    ip: ip,
+    action: action
+  }
+  File.open(LOG_FILE, 'a') { |file| file.puts(entry.to_json) }
+end
+
+def block_ip(ip)
+  BLOCKED_IPS << ip unless BLOCKED_IPS.include?(ip)
+  log_traffic(ip, "BLOCKED")
+  puts "IP Blocked: #{ip}"
+end
+
+loop do
+  client = server.accept
+  Thread.new do
+    begin
+      client_ip = client.peeraddr[3]
+
+      if BLOCKED_IPS.include?(client_ip)
+        puts "Rejected blocked IP: #{client_ip}"
+        client.close
+        next
+      end
+
+      timestamp = Time.now
+      traffic_data[client_ip] << timestamp
+      traffic_data[client_ip].delete_if { |time| time < timestamp - MONITOR_INTERVAL }
+
+      if traffic_data[client_ip].size > THRESHOLD_REQUESTS
+        block_ip(client_ip)
+      else
+        log_traffic(client_ip, "ALLOWED")
+        client.puts "Hello! Your traffic is being monitored."
+      end
+
+    rescue => e
+      puts "Error: #{e.message}"
+    ensure
+      client.close
+    end
+  end
+end
